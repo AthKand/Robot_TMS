@@ -28,9 +28,13 @@ class RobotControl:
         self.robot_coord_list = []
         self.matrix_tracker_to_robot = []
 
-        self.new_force_sensor_data = 0
+        self.new_force_sensor_data = []
         self.target_force_sensor_data = 0
         self.compensate_force_flag = False
+
+        # reference force and moment values  
+        self.force_ref = [0.0, 0.0, 0.0] 
+        self.moment_ref = [0.0, 0.0, 0.0]
 
         self.robot_tracker_flag = False
         self.target_index = None
@@ -177,6 +181,7 @@ class RobotControl:
         self.distance_to_target = list(translation) + list(angles_as_deg)
 
     def OnCoilAtTarget(self, data):
+        print(data["state"])
         self.coil_at_target_state = data["state"]
 
     def ElfinRobot(self, robot_IP):
@@ -330,6 +335,7 @@ class RobotControl:
                         and self.motion_step_flag == const.ROBOT_MOTIONS["normal"]:
                     # tunes the robot position based on neuronavigation
                     self.trck_init_robot.TuneTarget(self.distance_to_target)
+
                 else:
                     self.trck_init_robot.SendCoordinatesControl(new_robot_target_coordinates, self.motion_step_flag)
 
@@ -351,7 +357,16 @@ class RobotControl:
 
         current_robot_coordinates = self.robot_coordinates.GetRobotCoordinates()
 
-        self.new_force_sensor_data = self.trck_init_robot.GetForceSensorData()
+        force_values = self.trck_init_robot.GetForceSensorData()[0:3]
+        moment_values = self.trck_init_robot.GetForceSensorData()[3:6]
+
+        print(force_values)
+        print(moment_values)
+
+        force_normalised = force_values - self.force_ref
+        moment_normalised = moment_values - self.moment_ref
+
+        self.new_force_sensor_data = force_normalised[2]
 
         if self.tracker_coordinates.m_tracker_to_robot is not None:
             coord_head_tracker_in_robot = elfin_process.transform_tracker_to_robot(self.tracker_coordinates.m_tracker_to_robot, coord_head_tracker_filtered)

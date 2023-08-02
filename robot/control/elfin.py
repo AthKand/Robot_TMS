@@ -44,7 +44,7 @@ class Elfin_Server():
 
     def GetForceSensorData(self):
         if const.FORCE_TORQUE_SENSOR:
-            return self.cobot.ReadForceSensorData()[2]
+            return self.cobot.ReadForceSensorData()
         else:
             return False
 
