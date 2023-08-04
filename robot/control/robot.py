@@ -32,9 +32,9 @@ class RobotControl:
         self.target_force_sensor_data = 0
         self.compensate_force_flag = False
 
-        # reference force and moment values  
-        self.force_ref = [0.0, 0.0, 0.0] 
-        self.moment_ref = [0.0, 0.0, 0.0]
+        # reference force and moment values
+        self.force_ref = np.array([0.0, 0.0, 0.0])
+        self.moment_ref = np.array([0.0, 0.0, 0.0])
 
         self.robot_tracker_flag = False
         self.target_index = None
@@ -247,7 +247,7 @@ class RobotControl:
                 self.rc.send_message(topic, data)
                 print('Request new robot transformation matrix')
 
-    def robot_motion(self, current_robot_coordinates, new_robot_coordinates, coord_head_tracker, marker_coil_flag, tunning_to_target):
+    def robot_motion(self, current_robot_coordinates, new_robot_coordinates, coord_head_tracker, marker_coil_flag, tunning_to_target, ft_values):
         robot_status = True
         if self.coord_inv_old is None:
             self.coord_inv_old = new_robot_coordinates
@@ -258,12 +258,12 @@ class RobotControl:
             self.coord_inv_old = new_robot_coordinates
         else:
             robot_status = self.robot_move_decision(new_robot_coordinates, current_robot_coordinates,
-                                                    coord_head_tracker, tunning_to_target)
+                                                    coord_head_tracker, tunning_to_target, ft_values)
             self.coord_inv_old = new_robot_coordinates
 
         return robot_status
 
-    def robot_move_decision(self, new_robot_coordinates, current_robot_coordinates, coord_head_tracker, tunning_to_target):
+    def robot_move_decision(self, new_robot_coordinates, current_robot_coordinates, coord_head_tracker, tunning_to_target, ft_values):
         """
         There are two types of robot movements.
         We can imagine in two concentric spheres of different sizes. The inside sphere is to compensate for small head movements.
@@ -317,6 +317,7 @@ class RobotControl:
                         elif elfin_process.correction_distance_calculation_target(target_arc[3:-1], current_robot_coordinates_flip_angle) < const.ROBOT_ARC_THRESHOLD_DISTANCE/3:
                             self.motion_step_flag = const.ROBOT_MOTIONS["normal"]
                             self.target_arc = tunning_to_target
+
                     new_robot_target_coordinates = self.target_arc
 
                     #if np.allclose(np.array(current_robot_coordinates)[:3], np.array(self.target_arc[3:-1])[:3], 0, 20):
@@ -335,6 +336,9 @@ class RobotControl:
                         and self.motion_step_flag == const.ROBOT_MOTIONS["normal"]:
                     # tunes the robot position based on neuronavigation
                     self.trck_init_robot.TuneTarget(self.distance_to_target)
+                    print('Distance to target: ', self.distance_to_target)
+                    self.force_ref = ft_values[0:3]
+                    self.moment_ref = ft_values[3:6]
 
                 else:
                     self.trck_init_robot.SendCoordinatesControl(new_robot_target_coordinates, self.motion_step_flag)
@@ -357,14 +361,16 @@ class RobotControl:
 
         current_robot_coordinates = self.robot_coordinates.GetRobotCoordinates()
 
-        force_values = self.trck_init_robot.GetForceSensorData()[0:3]
-        moment_values = self.trck_init_robot.GetForceSensorData()[3:6]
+        ft_values = np.array(self.self.trck_init_robot.GetForceSensorData())
+
+        force_current = ft_values[0:3]
+        moment_current = ft_values[3:6]
 
         print(force_values)
         print(moment_values)
 
-        force_normalised = force_values - self.force_ref
-        moment_normalised = moment_values - self.moment_ref
+        self.force_normalised = force_current - self.force_ref
+        self.moment_normalised = moment_current - self.moment_ref
 
         self.new_force_sensor_data = force_normalised[2]
 
@@ -385,7 +391,7 @@ class RobotControl:
                     if self.process_tracker.compute_head_move_threshold(coord_head_tracker_in_robot):
                         new_robot_coordinates = elfin_process.compute_head_move_compensation(coord_head_tracker_in_robot, self.m_change_robot_to_head)
                         tunning_to_target = self.OnTuneTCP()
-                        robot_status = self.robot_motion(current_robot_coordinates, new_robot_coordinates, coord_head_tracker_filtered, marker_coil_flag, tunning_to_target)
+                        robot_status = self.robot_motion(current_robot_coordinates, new_robot_coordinates, coord_head_tracker_filtered, marker_coil_flag, tunning_to_target, ft_values)
                     else:
                         print("Head is moving too much")
                         self.trck_init_robot.StopRobot()
