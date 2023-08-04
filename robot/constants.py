@@ -1,5 +1,5 @@
 #Robot
-SITE = "usp_coil"
+SITE = "aalto"
 # Define the required offset to align the coil and robot end effector
 if SITE == "usp_coil":
     ROBOT_RX_OFFSET = 0
