@@ -40,9 +40,8 @@ class RobotControl:
         self.prev_state_flag = 0  # 0 for inside circle, 1 for outer circle
 
         if const.DISPLAY_POA:
-            self.temp_file = open('tmp', 'a')
-            ft.PointOfApp(self.temp_file)
-
+            self.poa =ft.PointOfApp()
+            self.init_animation = True
 
         self.robot_tracker_flag = False
         self.target_index = None
@@ -381,12 +380,15 @@ class RobotControl:
         force_current = ft_values[0:3]
         moment_current = ft_values[3:6]
 
-        #print(moment_current)
+        self.force_normalised = list(force_current - self.force_ref)
+        self.moment_normalised = list(moment_current - self.moment_ref)
 
-        self.force_normalised = force_current - self.force_ref
-        self.moment_normalised = moment_current - self.moment_ref
-
-        self.temp_file.write(np.append(self.force_normalised, self.moment_normalised))
+        if const.DISPLAY_POA:
+            with open('tmp', 'a') as tmpfile:
+            tmpfile.write('{self.force_normalised+self.moment_normalised}\n')
+            if self.init_animation:
+                self.poa.animate(tmpfile)
+                self.init_animation = False
 
         #print(self.force_normalised)
 

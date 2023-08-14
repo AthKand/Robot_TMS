@@ -8,6 +8,8 @@ import matplotlib.animation as animation
 from collections import deque
 from scipy.optimize import minimize
 
+matplotlib.use('TkAgg')
+
 
 def delete_file(file):
     if os.path.exists(file):
@@ -18,9 +20,7 @@ def delete_file(file):
 
 class PointOfApp:
 
-    def __init__(self, file):
-
-        self.file = file
+    def __init__(self):
 
         # Rotation and Translation matrices to find pos on mTMS head
         self.R = np.load('robot/resources/Rot.npy')
@@ -46,14 +46,14 @@ class PointOfApp:
         self.ax.set_xlim(-20, 20)
         self.ax.set_ylim(-20, 20)
         self.point, = self.ax.plot(0, 0, 'ro', markersize=10)
-        # self.kf_point, = self.ax2.plot(0, 0, 'g+', markersize=20)
 
-        ani = animation.FuncAnimation(self.fig, self.loop, fargs=(), interval=1)
+
+    def animate(self, file):
+        ani = animation.FuncAnimation(self.fig, self.loop, fargs=(file,), interval=1)
         plt.show()
 
-        atexit.register(delete_file, self.file)
+        atexit.register(delete_file, file.name)
 
-        #self.loop()
 
     def _func(self, r, F, M, orig):
         '''
@@ -85,26 +85,24 @@ class PointOfApp:
         return [round(r_min[i], 1) for i in range(0, len(r_min))]
 
 
-    def loop(self, i):
+    def loop(self, i, file):
         '''
         Loop to read live sensor data and perform relevant operations. 
 
-        Performs: Live plotting, 
-                write-to-csv, 
-                normalise(tare) values
         '''
-        with open(self.file, 'rb') as f:
-            try:  # catch OSError in case of a one line file 
-                f.seek(-2, os.SEEK_END)
-                while f.read(1) != b'\n':
-                    f.seek(-2, os.SEEK_CUR)
-            except OSError:
-                f.seek(0)
-            data = f.readline().decode()
-            print(data)
+        # with open(self.file, 'rb') as f:
+        try:  # catch OSError in case of a one line file 
+            file.seek(-2, os.SEEK_END)
+            while file.read(1) != b'\n':
+                file.seek(-2, os.SEEK_CUR)
+        except OSError:
+            file.seek(0)
+        data = file.readline().decode()
+        print(data)
 
-        F_vect  = data[:3]
-        M_vect = data[3:]
+        data = data[data.find("[")+1:data.find(" ]")]
+        F_vect  = np.array(data.split(", ")[:3], dtype = 'float64')
+        M_vect = np.array(data.split(", ")[3:], dtype = 'float64')
 
         # Add new value to the lists
         self.F_values.append(F_vect)
