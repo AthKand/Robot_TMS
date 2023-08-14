@@ -6,6 +6,7 @@ import robot.constants as const
 import robot.transformations as tr
 
 import robot.control.elfin as elfin
+import robot.control.ft as ft
 import robot.control.coordinates as coordinates
 import robot.control.elfin_processing as elfin_process
 
@@ -37,6 +38,11 @@ class RobotControl:
         self.moment_ref = np.array([0.0, 0.0, 0.0])
         self.inside_circle = False
         self.prev_state_flag = 0  # 0 for inside circle, 1 for outer circle
+
+        if const.DISPLAY_POA:
+            self.temp_file = open('tmp', 'a')
+            ft.PointOfApp(self.temp_file)
+
 
         self.robot_tracker_flag = False
         self.target_index = None
@@ -379,6 +385,8 @@ class RobotControl:
 
         self.force_normalised = force_current - self.force_ref
         self.moment_normalised = moment_current - self.moment_ref
+
+        self.temp_file.write(np.append(self.force_normalised, self.moment_normalised))
 
         #print(self.force_normalised)
 

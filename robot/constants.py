@@ -35,6 +35,7 @@ ROBOT_TARGET_TUNING_THRESHOLD_DISTANCE = 30
 ROBOT_TARGET_TUNING_THRESHOLD_ANGLE = 5
 
 FORCE_TORQUE_SENSOR = True
+DISPLAY_POA = True
 
 #Robot Working Space is defined as 800mm in Elfin manual. For safety, the value is reduced by 5%.
 ROBOT_WORKING_SPACE = 1000 #mm
