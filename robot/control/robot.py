@@ -39,10 +39,6 @@ class RobotControl:
         self.inside_circle = False
         self.prev_state_flag = 0  # 0 for inside circle, 1 for outer circle
 
-        if const.DISPLAY_POA:
-            self.poa =ft.PointOfApp()
-            self.init_animation = True
-
         self.robot_tracker_flag = False
         self.target_index = None
         self.target_flag = False
@@ -376,23 +372,21 @@ class RobotControl:
         current_robot_coordinates = self.robot_coordinates.GetRobotCoordinates()
 
         ft_values = np.array(self.trck_init_robot.GetForceSensorData())
+        current_F = ft_values[0:3]
+        current_M = ft_values[3:6]
+        F_normalised = current_F - self.force_ref
+        M_normalised = current_M - self.moment_ref
+        point_of_application = ft.find_r(F_normalised, M_normalised)
 
-        force_current = ft_values[0:3]
-        moment_current = ft_values[3:6]
+        print(point_of_application)
 
-        self.force_normalised = list(force_current - self.force_ref)
-        self.moment_normalised = list(moment_current - self.moment_ref)
-
-        if const.DISPLAY_POA:
-            with open('tmp', 'a') as tmpfile:
-            tmpfile.write('{self.force_normalised+self.moment_normalised}\n')
-            if self.init_animation:
-                self.poa.animate(tmpfile)
-                self.init_animation = False
+        if const.DISPLAY_POA and len(point_of_application) == 3:
+            with open(const.TEMP_FILE, 'a') as tmpfile:
+                tmpfile.write(f'{point_of_application}\n')
 
         #print(self.force_normalised)
 
-        self.new_force_sensor_data = self.force_normalised[2]
+        self.new_force_sensor_data = F_normalised[2]
 
         if self.tracker_coordinates.m_tracker_to_robot is not None:
             coord_head_tracker_in_robot = elfin_process.transform_tracker_to_robot(self.tracker_coordinates.m_tracker_to_robot, coord_head_tracker_filtered)
