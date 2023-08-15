@@ -1,6 +1,7 @@
 
 import dataclasses
 import numpy as np
+from collections import deque
 
 import robot.constants as const
 import robot.transformations as tr
@@ -38,6 +39,8 @@ class RobotControl:
         self.moment_ref = np.array([0.0, 0.0, 0.0])
         self.inside_circle = False
         self.prev_state_flag = 0  # 0 for inside circle, 1 for outer circle
+        self.F_dq = deque(maxlen=6)
+        self.M_dq = deque(maxlen=6)
 
         self.robot_tracker_flag = False
         self.target_index = None
@@ -345,7 +348,7 @@ class RobotControl:
                         self.force_ref = ft_values[0:3]
                         self.moment_ref = ft_values[3:6]
                         print('Normalised!')
-                        print(self.force_ref)
+                        # print(self.force_ref)
                     self.prev_state_flag = 0 
 
                 else:
@@ -372,13 +375,19 @@ class RobotControl:
         current_robot_coordinates = self.robot_coordinates.GetRobotCoordinates()
 
         ft_values = np.array(self.trck_init_robot.GetForceSensorData())
+        # true f-t value
         current_F = ft_values[0:3]
         current_M = ft_values[3:6]
         F_normalised = current_F - self.force_ref
         M_normalised = current_M - self.moment_ref
-        point_of_application = ft.find_r(F_normalised, M_normalised)
+        self.F_dq.append(F_normalised)
+        self.M_dq.append(M_normalised)
+        # smoothed f-t value, to increase size of filter increase deque size 
+        F_avg = np.mean(self.F_dq, axis=0)
+        M_avg = np.mean(self.M_dq, axis=0)
+        point_of_application = ft.find_r(F_avg, M_avg)
 
-        print(point_of_application)
+        # print(point_of_application)
 
         if const.DISPLAY_POA and len(point_of_application) == 3:
             with open(const.TEMP_FILE, 'a') as tmpfile:
