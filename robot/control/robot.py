@@ -2,6 +2,7 @@
 import dataclasses
 import numpy as np
 from collections import deque
+from pynput import keyboard
 
 import robot.constants as const
 import robot.transformations as tr
@@ -41,6 +42,10 @@ class RobotControl:
         self.prev_state_flag = 0  # 0 for inside circle, 1 for outer circle
         self.F_dq = deque(maxlen=6)
         self.M_dq = deque(maxlen=6)
+
+        self.REF_FLAG = False
+        listener = keyboard.Listener(on_press=self._on_press)
+        listener.start()
 
         self.robot_tracker_flag = False
         self.target_index = None
@@ -206,6 +211,25 @@ class RobotControl:
         topic = 'Robot connection status'
         data = {'data': status_connection}
         self.rc.send_message(topic, data)
+
+    def _on_press(self, key):
+        '''
+        Listen to keyboard press while the loop to display 
+        F - T values is running. 
+
+        Returns: None - regular actions
+                    False - stop listener
+
+        '''
+        if key == keyboard.Key.esc:
+            return False  # stop listener
+        try:
+            k = key.char  # single-char keys
+        except:
+            k = key.name  # other keys
+        if k == 'n':
+            print('Normalising . . . .')
+            self.REF_FLAG = True
 
     def update_robot_coordinates(self):
         coord_robot_raw = self.trck_init_robot.Run()
@@ -379,22 +403,27 @@ class RobotControl:
         # true f-t value
         current_F = ft_values[0:3]
         current_M = ft_values[3:6]
+        # normalised f-t value
         F_normalised = current_F - self.force_ref
         M_normalised = current_M - self.moment_ref
-        self.F_dq.append(np.moveaxis(F_normalised, 0, 1))  # change to robot axis -- relevant for aalto robot
-        self.M_dq.append(np.moveaxis(M_normalised, 0, 1))
+        F_normalised[0], F_normalised[1] = F_normalised[1], F_normalised[0] # change to robot axis -- relevant for aalto robot
+        M_normalised[0], M_normalised[1] = M_normalised[1], M_normalised[0]
+        self.F_dq.append(F_normalised)  
+        self.M_dq.append(M_normalised)
+
+        if self.REF_FLAG:
+            self.force_ref = current_F
+            self.moment_ref = current_M
+            self.REF_FLAG = False
+
         # smoothed f-t value, to increase size of filter increase deque size 
         F_avg = np.mean(self.F_dq, axis=0)
         M_avg = np.mean(self.M_dq, axis=0)
         point_of_application = ft.find_r(F_avg, M_avg)
 
-        # print(point_of_application)
-
         if const.DISPLAY_POA and len(point_of_application) == 3:
             with open(const.TEMP_FILE, 'a') as tmpfile:
                 tmpfile.write(f'{point_of_application}\n')
-
-        #print(self.force_normalised)
 
         self.new_force_sensor_data = F_normalised[2]
 
