@@ -372,6 +372,7 @@ class RobotControl:
         marker_coil_flag = markers_flag[2]
         coord_head_tracker_filtered = self.process_tracker.kalman_filter(current_tracker_coordinates[1])
 
+        # TODO: condition for const.FORCE_TORQUE_SENSOR
         current_robot_coordinates = self.robot_coordinates.GetRobotCoordinates()
 
         ft_values = np.array(self.trck_init_robot.GetForceSensorData())
@@ -380,8 +381,8 @@ class RobotControl:
         current_M = ft_values[3:6]
         F_normalised = current_F - self.force_ref
         M_normalised = current_M - self.moment_ref
-        self.F_dq.append(F_normalised)
-        self.M_dq.append(M_normalised)
+        self.F_dq.append(np.moveaxis(F_normalised, 0, 1))  # change to robot axis -- relevant for aalto robot
+        self.M_dq.append(np.moveaxis(M_normalised, 0, 1))
         # smoothed f-t value, to increase size of filter increase deque size 
         F_avg = np.mean(self.F_dq, axis=0)
         M_avg = np.mean(self.M_dq, axis=0)
@@ -401,6 +402,12 @@ class RobotControl:
             coord_head_tracker_in_robot = elfin_process.transform_tracker_to_robot(self.tracker_coordinates.m_tracker_to_robot, coord_head_tracker_filtered)
         else:
             coord_head_tracker_in_robot = coord_head_tracker_filtered
+
+        # Calculate vector of point of application vs centre
+        distance = [point_of_application[0], point_of_application[1]]
+
+
+        # TODO: Change this entire part to compensate force properly in a feedback loop 
 
         #CHECK IF TARGET FROM INVESALIUS
         if self.robot_tracker_flag and np.all(self.m_change_robot_to_head[:3]):

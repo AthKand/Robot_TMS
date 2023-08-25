@@ -51,7 +51,7 @@ def find_r(F, M):
 
     else:
         if F[2] > 1:
-            print(r_tran)
+            #print(r_tran)
             pass
         else:
             r_tran[0], r_tran[1] = 0, 0

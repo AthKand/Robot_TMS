@@ -24,7 +24,7 @@ class PointOfApp:
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(1, 1, 1)
         self.square = FancyBboxPatch((-12, -12), 24, 24, alpha=0.5, boxstyle="round,pad=3")
-        self.ax.add_patch(self.square)
+        self.ax.add_patch(self.square) 
         self.ax.set_xlim(-20, 20)
         self.ax.set_ylim(-20, 20)
         self.point, = self.ax.plot(0, 0, 'ro', markersize=10)
