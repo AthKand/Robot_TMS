@@ -399,15 +399,13 @@ class RobotControl:
         # TODO: condition for const.FORCE_TORQUE_SENSOR
         current_robot_coordinates = self.robot_coordinates.GetRobotCoordinates()
 
-        ft_values = np.array(self.trck_init_robot.GetForceSensorData())
+        ft_values = np.array(self.trck_init_robot.GetForceSensorData()) 
         # true f-t value
         current_F = ft_values[0:3]
         current_M = ft_values[3:6]
         # normalised f-t value
         F_normalised = current_F - self.force_ref
         M_normalised = current_M - self.moment_ref
-        F_normalised[0], F_normalised[1] = F_normalised[1], F_normalised[0] # change to robot axis -- relevant for aalto robot
-        M_normalised[0], M_normalised[1] = M_normalised[1], M_normalised[0]
         self.F_dq.append(F_normalised)  
         self.M_dq.append(M_normalised)
 
@@ -420,6 +418,8 @@ class RobotControl:
         F_avg = np.mean(self.F_dq, axis=0)
         M_avg = np.mean(self.M_dq, axis=0)
         point_of_application = ft.find_r(F_avg, M_avg)
+
+        point_of_application[0], point_of_application[1] = point_of_application[1], point_of_application[0] #change in axis, relevant for only aalto robot 
 
         if const.DISPLAY_POA and len(point_of_application) == 3:
             with open(const.TEMP_FILE, 'a') as tmpfile:
@@ -435,7 +435,6 @@ class RobotControl:
         # Calculate vector of point of application vs centre
         distance = [point_of_application[0], point_of_application[1]]
 
-
         # TODO: Change this entire part to compensate force properly in a feedback loop 
 
         #CHECK IF TARGET FROM INVESALIUS
@@ -449,6 +448,11 @@ class RobotControl:
                     #CHECK HEAD VELOCITY
                     if self.process_tracker.compute_head_move_threshold(coord_head_tracker_in_robot):
                         new_robot_coordinates = elfin_process.compute_head_move_compensation(coord_head_tracker_in_robot, self.m_change_robot_to_head)
+                        if self.coil_at_target_state:
+                            if np.sqrt(np.sum(np.square(point_of_application[:2]))) < 20:
+                                print(self.coil_at_target_state)
+                                new_robot_coordinates[:2] = new_robot_coordinates[:2] + distance 
+                        print(new_robot_coordinates)
                         tunning_to_target = self.OnTuneTCP()
                         robot_status = self.robot_motion(current_robot_coordinates, new_robot_coordinates, coord_head_tracker_filtered, marker_coil_flag, tunning_to_target, ft_values)
                     else:
