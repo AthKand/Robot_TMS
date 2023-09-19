@@ -46,6 +46,7 @@ class RobotControl:
         self.REF_FLAG = False
         listener = keyboard.Listener(on_press=self._on_press)
         listener.start()
+        self.status = True
 
         self.robot_tracker_flag = False
         self.target_index = None
@@ -61,6 +62,7 @@ class RobotControl:
 
         self.coil_at_target_state = False
         self.distance_to_target = [0]*6
+        self.ft_distance_offset = [0, 0]
 
         self.robot_coord_matrix_list = np.zeros((4, 4))[np.newaxis]
         self.coord_coil_matrix_list = np.zeros((4, 4))[np.newaxis]
@@ -84,6 +86,7 @@ class RobotControl:
                 print("Removing robot target")
             else:
                 target = np.array(target).reshape(4, 4)
+                print(target)
                 self.m_change_robot_to_head = self.process_tracker.estimate_robot_target(self.tracker_coordinates, target)
                 self.target_force_sensor_data = self.new_force_sensor_data
                 print("Setting robot target")
@@ -189,6 +192,8 @@ class RobotControl:
     def OnDistanceToTarget(self, data):
         distance = data["distance"]
         translation, angles_as_deg = self.OnCoilToRobotAlignment(distance)
+        translation[0] += self.ft_distance_offset[0]
+        translation[1] += self.ft_distance_offset[1] 
         self.distance_to_target = list(translation) + list(angles_as_deg)
 
     def OnCoilAtTarget(self, data):
@@ -210,6 +215,14 @@ class RobotControl:
 
         topic = 'Robot connection status'
         data = {'data': status_connection}
+        self.rc.send_message(topic, data)
+
+    def SensorUpdateTarget(self, distance, status):
+        topic = 'Update target from FT values'
+        data = {'data' : (distance, status)} 
+
+        self.status = False 
+
         self.rc.send_message(topic, data)
 
     def _on_press(self, key):
@@ -419,7 +432,7 @@ class RobotControl:
         M_avg = np.mean(self.M_dq, axis=0)
         point_of_application = ft.find_r(F_avg, M_avg)
 
-        point_of_application[0], point_of_application[1] = point_of_application[1], point_of_application[0] #change in axis, relevant for only aalto robot 
+        point_of_application[0], point_of_application[1] = -point_of_application[1], -point_of_application[0] #change in axis, relevant for only aalto robot 
 
         if const.DISPLAY_POA and len(point_of_application) == 3:
             with open(const.TEMP_FILE, 'a') as tmpfile:
@@ -434,6 +447,7 @@ class RobotControl:
 
         # Calculate vector of point of application vs centre
         distance = [point_of_application[0], point_of_application[1]]
+        #self.ft_distance_offset = [point_of_application[0], point_of_application[1]]
 
         # TODO: Change this entire part to compensate force properly in a feedback loop 
 
@@ -448,11 +462,11 @@ class RobotControl:
                     #CHECK HEAD VELOCITY
                     if self.process_tracker.compute_head_move_threshold(coord_head_tracker_in_robot):
                         new_robot_coordinates = elfin_process.compute_head_move_compensation(coord_head_tracker_in_robot, self.m_change_robot_to_head)
-                        if self.coil_at_target_state:
-                            if np.sqrt(np.sum(np.square(point_of_application[:2]))) < 20:
-                                print(self.coil_at_target_state)
-                                new_robot_coordinates[:2] = new_robot_coordinates[:2] + distance 
-                        print(new_robot_coordinates)
+                        if np.sqrt(np.sum(np.square(self.distance_to_target[:3]))) < 10: # check if coil is 20mm from target and look for ft readout  
+                            if np.sqrt(np.sum(np.square(point_of_application[:2]))) > 0.5:
+                                if self.status:
+                                    self.SensorUpdateTarget(distance, self.status)
+                                    self.status = False
                         tunning_to_target = self.OnTuneTCP()
                         robot_status = self.robot_motion(current_robot_coordinates, new_robot_coordinates, coord_head_tracker_filtered, marker_coil_flag, tunning_to_target, ft_values)
                     else:

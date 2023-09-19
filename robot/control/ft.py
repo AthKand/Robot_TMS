@@ -42,7 +42,6 @@ def find_r(F, M):
     
     r_min = res.x * 100  # multiply by 100 to get value in cm
     r_tran = R @ r_min + T
-    # print(F[2]) 
 
     # conditions to identify p.o.a
     if not (-15 <= r_tran[0] <= 15 and 
